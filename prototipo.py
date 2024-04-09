@@ -14,21 +14,43 @@ def main(page: ft.Page):
 
     matrix_container = ft.Column([], spacing=10)
 
+    divider = ft.Divider(thickness=2)
+    v_divider = ft.VerticalDivider(thickness=3)
+
     def update_matrix_layout():
         matrix_container.controls.clear()
-        for row in matrix_rows:
-            matrix_container.controls.append(ft.Row([cell for cell in row], spacing=5))
+        for row_index, row in enumerate(matrix_rows):
+            row_controls = [cell for cell_index, cell in enumerate(row)]
+            matrix_container.controls.append(ft.Row(row_controls, spacing=5))
         page.update()
 
     def toggle_theme(e):
         page.theme_mode = ft.ThemeMode.DARK if page.theme_mode == ft.ThemeMode.LIGHT else ft.ThemeMode.LIGHT
         theme_icon.icon = ft.icons.LIGHT_MODE_ROUNDED if page.theme_mode == ft.ThemeMode.DARK else ft.icons.DARK_MODE_ROUNDED
+
+        for row in matrix_rows:
+            for cell in row:
+                cell.bgcolor = ft.colors.WHITE if page.theme_mode == ft.ThemeMode.LIGHT else ft.colors.GREY_800
+
+        update_matrix_layout()
+        if right_top_section.controls:
+            mostrar_resultados(obtener_matriz())
         page.update()
 
-    theme_icon = ft.IconButton(icon=ft.icons.LIGHT_MODE_ROUNDED, tooltip="Toggle theme", on_click=toggle_theme)
+    theme_icon = ft.IconButton(icon=ft.icons.LIGHT_MODE_ROUNDED, tooltip="Cambiar tema", on_click=toggle_theme)
+
+    file_picker = ft.FilePicker()
+    page.overlay.append(file_picker)
+    page.update()
 
     def create_text_field() -> ft.TextField:
-        return ft.TextField(width=60, text_align=ft.TextAlign.CENTER)
+        return ft.TextField(width=60, text_align=ft.TextAlign.CENTER, bgcolor=ft.colors.WHITE if page.theme_mode == ft.ThemeMode.LIGHT else ft.colors.GREY_800)
+
+    def create_result_field(value: str) -> ft.TextField:
+        bgcolor = ft.colors.GREY_300 if page.theme_mode == ft.ThemeMode.LIGHT else ft.colors.GREY_700
+        text_color = ft.colors.BLACK if page.theme_mode == ft.ThemeMode.LIGHT else ft.colors.WHITE
+        return ft.TextField(value=value, width=60, text_align=ft.TextAlign.CENTER, read_only=True, bgcolor=bgcolor,
+                            color=text_color)
 
     def adjust_matrix_size(new_rows, new_columns):
         while len(matrix_rows) < new_rows:
@@ -61,10 +83,12 @@ def main(page: ft.Page):
             factor = matriz[i, fila_pivote] / matriz[fila_pivote, fila_pivote]
             matriz[i] = matriz[i] - factor * matriz[fila_pivote]
 
-    def clear_matrix():
+    def clear_matrix(event=None):
         for row in matrix_rows:
             for cell in row:
                 cell.value = ""
+        right_top_section.controls.clear()
+        right_bottom_section.controls.clear()
         page.update()
 
     def solve_matrix(event=None):
@@ -75,7 +99,6 @@ def main(page: ft.Page):
             n_filas, n_cols = matriz.shape
 
             for fila_pivote in range(n_filas):
-                # Busca el máximo en esta columna desde fila_pivote hasta el final
                 fila_max = np.argmax(abs(matriz[fila_pivote:, fila_pivote])) + fila_pivote
                 cambiar_filas(matriz, fila_pivote, fila_max)
 
@@ -101,12 +124,14 @@ def main(page: ft.Page):
     def mostrar_resultados(matriz):
         right_top_section.controls.clear()
         right_bottom_section.controls.clear()
+        for fila in matriz:
+            result_row = [create_result_field(f"{int(num) if num.is_integer() else num:.2f}".replace('-0.00', '0.00'))
+                          for num in fila]
+            right_top_section.controls.append(ft.Row(result_row, spacing=5))
 
-        matriz_texto = "\n".join(["\t".join([f"{num:.2f}" for num in fila]) for fila in matriz])
         solucion_texto = "\n".join([f"x{i + 1} = {matriz[i, -1]:.2f}" for i in range(matriz.shape[0])])
-
-        right_top_section.controls.append(ft.Text(matriz_texto))
         right_bottom_section.controls.append(ft.Text(solucion_texto))
+
         page.update()
 
     def show_error(message):
@@ -115,16 +140,31 @@ def main(page: ft.Page):
         page.update()
 
     toolbar_buttons = [
+        ft.IconButton(icon=ft.icons.FILE_DOWNLOAD_ROUNDED, tooltip="Exportar Matriz"),
+        ft.IconButton(icon=ft.icons.UPLOAD_FILE, tooltip="Importar Matriz",
+                      on_click=lambda _: file_picker.pick_files(allow_multiple=True)),
         ft.IconButton(icon=ft.icons.PLAY_ARROW, tooltip="Solve matrix", on_click=solve_matrix),
         ft.IconButton(icon=ft.icons.CLEANING_SERVICES, tooltip="Clear matrix", on_click=clear_matrix),
     ]
 
-    toolbar = ft.Row([*toolbar_buttons, theme_icon], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, expand=True)
-    page.add(toolbar)
+    toolbar = ft.Row(
+        toolbar_buttons + [v_divider, ft.Container(width=20),v_divider, theme_icon],
+        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        expand=True
+    )
+
+    toolbar_container = ft.Container(content=toolbar, padding=5)
 
     left_section = ft.Container(content=matrix_container, padding=20, expand=True)
-    content_section = ft.Row([left_section, ft.VerticalDivider(), right_top_section, right_bottom_section], expand=True,
-                             spacing=10)
-    page.add(content_section)
+
+    right_section = ft.Column(controls=[right_top_section, divider, right_bottom_section])
+
+    content_section = ft.Row([
+        ft.Container(content=left_section, width=600, expand=True),
+        v_divider,
+        ft.Container(content=right_section, width=600, expand=True),
+    ], expand=True)
+
+    page.add(toolbar_container, divider, content_section)
 
 ft.app(target=main)

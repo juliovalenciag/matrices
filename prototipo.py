@@ -17,6 +17,9 @@ def main(page: ft.Page):
     divider = ft.Divider(thickness=2)
     v_divider = ft.VerticalDivider(thickness=3)
 
+    row_input = ft.TextField(label="Filas:", value="3", width=400)
+    column_input = ft.TextField(label="Columnas:", value="4", width=400)
+
     def update_matrix_layout():
         matrix_container.controls.clear()
         for row_index, row in enumerate(matrix_rows):
@@ -52,19 +55,54 @@ def main(page: ft.Page):
         return ft.TextField(value=value, width=60, text_align=ft.TextAlign.CENTER, read_only=True, bgcolor=bgcolor,
                             color=text_color)
 
-    def adjust_matrix_size(new_rows, new_columns):
-        while len(matrix_rows) < new_rows:
-            matrix_rows.append([create_text_field() for _ in range(new_columns)])
-        while len(matrix_rows) > new_rows:
-            matrix_rows.pop()
-        for row in matrix_rows:
-            while len(row) < new_columns:
-                row.append(create_text_field())
-            while len(row) > new_columns:
-                row.pop()
-        update_matrix_layout()
+    def adjust_matrix_size(e=None, new_rows=None, new_columns=None):
+        if e is not None:
+            new_rows = int(row_input.value)
+            new_columns = int(column_input.value)
 
-    adjust_matrix_size(3, 4)
+        # Ensure that new_rows and new_columns are not None
+        if new_rows is not None and new_columns is not None:
+            while len(matrix_rows) < new_rows:
+                matrix_rows.append([create_text_field() for _ in range(new_columns)])
+            while len(matrix_rows) > new_rows:
+                matrix_rows.pop()
+
+            for row in matrix_rows:
+                while len(row) < new_columns:
+                    row.append(create_text_field())
+                while len(row) > new_columns:
+                    row.pop()
+
+            update_matrix_layout()
+            if e is not None:  # Only close the bottom sheet if called via a button event
+                bottom_sheet.open = False
+
+    def close_bottom_sheet(e):
+        bottom_sheet.open = False
+        page.update()
+
+    bottom_sheet = ft.BottomSheet(
+        ft.Container(
+            ft.Column(
+                [
+                    row_input,
+                    column_input,
+                    ft.ElevatedButton(text="Aplicar", on_click=adjust_matrix_size,icon=ft.icons.PLAY_ARROW),
+                    ft.ElevatedButton(text="Cerrar", on_click=close_bottom_sheet,icon=ft.icons.CLOSE),
+                ],
+                tight=True,
+            ),
+            padding=25,
+        ),
+    )
+
+    def open_bottom_sheet(e):
+        bottom_sheet.open = True
+        page.update()
+
+    adjust_button = ft.ElevatedButton(text="Ajustar Matriz", on_click=open_bottom_sheet)
+
+
 
     def obtener_matriz():
         return np.array([[float(cell.value) for cell in row] for row in matrix_rows])
@@ -148,7 +186,7 @@ def main(page: ft.Page):
     ]
 
     toolbar = ft.Row(
-        toolbar_buttons + [v_divider, ft.Container(width=20),v_divider, theme_icon],
+        toolbar_buttons + [adjust_button, ft.Container(width=20), theme_icon],
         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         expand=True
     )
@@ -166,5 +204,6 @@ def main(page: ft.Page):
     ], expand=True)
 
     page.add(toolbar_container, divider, content_section)
+    page.bottom_sheet = bottom_sheet
 
 ft.app(target=main)
